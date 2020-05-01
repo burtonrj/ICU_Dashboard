@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1588319124682.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3516657941",
+    "id" : "9387A79A",
+    "lastKnownWriteTime" : 1588319123,
+    "last_content_update" : 1588319123,
+    "path" : "~/ICU_Dashboard/app.R",
+    "project_path" : "app.R",
+    "properties" : {
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
