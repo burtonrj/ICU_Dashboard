@@ -8,26 +8,25 @@
 #
 
 library(shiny)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(testit)
+library(plotly)
 
+source('etl_module.R')
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("Old Faithful Geyser Data"),
-
-    # Sidebar with a slider input for number of bins 
+    titlePanel("ICU Covid Dashboard"),
     sidebarLayout(
-        sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-        ),
-
-        # Show a plot of the generated distribution
+        sidebarPanel(img(src="cardiff-and-vale-LHB.jpg", width=200),
+                     br(),
+                     br(),
+                     img(src="universitylogo.jpg", width=100, align="center")),
         mainPanel(
-           plotOutput("distPlot")
+            h2("ICU L3 occupancy and forecasts", align = "center"),
+            h2("Admission statistics", align = "center"),
+            h2("Survival curves", align = "center")
         )
     )
 )
@@ -35,14 +34,6 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
 
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
-    })
 }
 
 # Run the application 
