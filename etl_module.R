@@ -38,6 +38,13 @@ i_cols <- c("NHS_Number", "age", "height",
             "RenalRT")
 admissions <- mutate_at(admissions, as.numeric, .vars=i_cols)
 # Admissions - factors
+admissions$covid19 <- replace_na(admissions$covid19, 0)
+admissions$covid19 <- unlist(map(admissions$covid19, function(x){
+  if(x==1){
+    return('Yes')
+    }
+  return('No')
+}))
 not_f_cols <- unlist(list(d_cols, dt_cols, c_cols, i_cols))
 f_cols <- setdiff(colnames(admissions), not_f_cols)
 admissions <- mutate_at(admissions, as.factor, .vars=f_cols)
@@ -48,6 +55,11 @@ c <- c[c != "Date"]
 occ <- mutate_at(occ, as.integer, .vars=c)
 
 ##### Wrangle
+## Admission
+admissions$`ICU Duration (hours)` <- with(admissions, 
+                                          difftime(ICUDischarge, 
+                                                   ICUAdmit,
+                                                   units="hours"))
 ## Occupancy
 process_datetime <- function(date, time){
   hour <- as.character(as.numeric(substr(time, 5, 6)) - 1)
