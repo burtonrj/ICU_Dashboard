@@ -8,9 +8,7 @@ admissions$covid19 <- unlist(map(admissions$covid19,
                                      return("No")}}))
 admissions %>% 
   ggplot(aes_string(x='age', fill='covid19')) +
-  geom_density(alpha=0.5, adjust=0.5) +
-  scale_fill_manual(values=c('grey', 'red'),
-                    labels=c('No', 'Yes')) +
+  geom_density(alpha=0.5, adjust=1) +
   ylab('') + 
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +

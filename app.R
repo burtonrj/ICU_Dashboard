@@ -71,6 +71,15 @@ ui <- fluidPage(
                                 h4('Inference tests'),
                                 textOutput(outputId="stat")),
                      column(6, plotlyOutput(outputId = "violin"))),
+            fluidRow(column(6, selectInput(inputId="density.x",
+                                           label="X-axis Variable",
+                                           choices=cont.vars,
+                                           selected="age"),
+                               numericInput(inputId="density.adjust",
+                                            label="Bandwidth adjustment",
+                                            value=1,
+                                            step=0.1)),
+                     column(6, plotlyOutput(outputId = "density"))),
             h2("Survival curves", align = "center")
         )
     )
@@ -113,14 +122,15 @@ server <- function(input, output) {
                "p.value"=wilcox.test(x, y, alternative = "two.sided")$p.value))
     }
     output$stat <- reactive({
+        y <- gsub("`", "", input$violin.y)
         covid <- as.numeric(unlist(admissions %>% 
                                        filter(covid19 == 'Yes') %>% 
-                                       select(input$violin.y)))
+                                       select(y)))
         not.covid <- as.numeric(unlist(admissions %>%
                                            filter(covid19 == 'No') %>% 
-                                           select(input$violin.y)))
-        covid.norm.p <- round(shapiro.test(covid)$p.value, digits=2)
-        not.covid.norm.p <- round(shapiro.test(not.covid)$p.value, digits=2)
+                                           select(y)))
+        covid.norm.p <- shapiro.test(covid)$p.value
+        not.covid.norm.p <- shapiro.test(not.covid)$p.value
         norm <- covid.p > 0.05 & not.covid.p > 0.05
         if(norm){
             # Are the variances equal?
@@ -138,13 +148,20 @@ server <- function(input, output) {
         }
         header <- paste(input$violin.y, "~ Covid infection status:", sep=" ")
         method <- paste("Method:", stats$method)
-        p <- paste("p-value:", round(stats$p.value, digits=3))
+        if(stats$p.value < 0.001){
+            p <- "p-value: < 0.001"
+        }else{
+            p <- paste("p-value:", round(stats$p.value, digits=3))
+        }
         paste(header, method, p, sep='; ')
     })
+    # Violin plot
     output$violin <- renderPlotly(
         ggplotly(
             admissions %>%
-                ggplot(aes_string(x='covid19', y=input$violin.y)) +
+                ggplot(aes_string(x='covid19', 
+                                  y=input$violin.y,
+                                  text='Hospital_Number')) +
                 geom_violin(alpha=0.1) +
                 geom_jitter(aes_string(fill=input$violin.colour), 
                             width=input$violin.jitter, 
@@ -155,6 +172,19 @@ server <- function(input, output) {
                 theme(panel.background = element_rect(fill = "white", 
                                                       colour = "grey50")) +
                 xlab('COVID-19 infected')
+        )
+    )
+    # Density plot
+    output$density <- renderPlotly(
+        ggplotly(
+            admissions %>% 
+                ggplot(aes_string(x=input$density.x, fill='covid19')) +
+                geom_density(alpha=0.5, adjust=input$density.adjust) +
+                ylab('') + 
+                scale_x_continuous(expand=c(0,0)) +
+                scale_y_continuous(expand=c(0,0)) +
+                theme(panel.background = element_rect(fill = "white", 
+                                                      colour = "grey50"))
         )
     )
     
