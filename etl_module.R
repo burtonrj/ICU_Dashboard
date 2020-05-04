@@ -56,10 +56,43 @@ occ <- mutate_at(occ, as.integer, .vars=c)
 
 ##### Wrangle
 ## Admission
-admissions$`ICU Duration (hours)` <- with(admissions, 
-                                          difftime(ICUDischarge, 
-                                                   ICUAdmit,
-                                                   units="hours"))
+surv <- function(x){
+  if(is.na(x)){
+    return(1)
+  }else if(grepl("Died", x, fixed=TRUE)){
+    return(2)
+  }else{
+    return(1)
+  }
+}
+calc.duration <- function(a, b, units="hours"){
+  if(is.na(b) == FALSE){
+    diff <- difftime(b, a, units=units)
+  }else{
+    diff <- difftime(Sys.Date(), a, units=units)
+  }
+  if(is.na(diff)){
+    return(NA)
+  }
+  if(diff < 0){
+    print("Warning: negative duration, returning NA")
+    return(NA)
+  }
+  return(diff)
+}
+
+admissions$`ICU Duration (hours)` <- unlist(map2(admissions$ICUAdmit,
+                                                 admissions$ICUDischarge,
+                                                 calc.duration))
+f <- partial(calc.duration, units="days")
+admissions$`Hosp Duration (days)` <- unlist(map2(admissions$ICUAdmit,
+                                                 admissions$Hosp_Disch_Date,
+                                                 f))
+
+admissions$ICUSurvival <- unlist(map(admissions$Unit_Outcome,
+                                     surv))
+admissions$HospSurvival <- unlist(map(admissions$Hosp_Outcome,
+                                      surv))
 ## Occupancy
 process_datetime <- function(date, time){
   hour <- as.character(as.numeric(substr(time, 5, 6)) - 1)

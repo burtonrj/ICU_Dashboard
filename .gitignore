@@ -1,5 +1,8 @@
 data
 specs.docx
+documentation.docx
 sys.png
 data.xlsx
 .Rproj.user
+.RData
+.Rhistory

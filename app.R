@@ -1,12 +1,3 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
 library(shinythemes)
 library(tidyverse)
@@ -14,13 +5,16 @@ library(readxl)
 library(lubridate)
 library(testit)
 library(plotly)
+library(survival)
+library(survminer)
 
 source('etl_module.R')
-# Fixed variables
+# Global variables
 cont.vars <- c('age', 'height', 'weight',
                'AP2', 'DaysVentilated',
-               '`ICU Duration (hours)`')
-disc.vars <- c('covid19', 'Unit_Outcome',
+               '`ICU Duration (hours)`',
+               '`Hosp Duration (days)`')
+disc.vars <- c('Unit_Outcome',
                'Hosp_Outcome', 'sex',
                'HIV/AIDS', 'Cancer',
                'Chemotherapy', 'ChronicHeart',
@@ -30,16 +24,33 @@ disc.vars <- c('covid19', 'Unit_Outcome',
                'Leukaemia_Chron', 'Lymphoma',
                'Portal_Hyper', 'Radiotherapy',
                'MechanicalVentilation', 'RenalRT')
-# Define UI for application
+all.vars <- c(cont.vars, disc.vars)
+kap.times <- c('ICU Duration (hours)', 'Hosp Duration (days)')
+kap.events <- c('ICUSurvival', 'HospSurvival')
+
+#--------------------------------------------------------#
+######################## FRONTEND ########################
+#--------------------------------------------------------#
+
 ui <- fluidPage(
     theme = shinytheme("united"),
     titlePanel("ICU Covid Dashboard"),
     sidebarLayout(
-        sidebarPanel(img(src="cardiff-and-vale-LHB.jpg", width=200),
+        sidebarPanel(img(src="logo.png", width=200),
                      br(),
                      br(),
-                     img(src="universitylogo.jpg", width=100, align="center")),
-        mainPanel(
+                     p("Welcome to the Cardiff ICU COVID-19 dashboard.
+                       This application runs in the R Shiny framework and
+                       helps visualise the standard output from WardWatcher.
+                       Data must be located in the app directory and named
+                       `data.xlsx`. See app documentation for details."),
+                     br(),
+                     p("Authored by: Ross Burton, Alexander Greenshield-Watson,
+                       and Michael Ware"),
+                     br(),
+                     h5("Contact"),
+                     p("burtonrj@cardiff.ac.uk; michael.ware@wales.nhs.uk")),
+        mainPanel(tabsetPanel(tabPanel("Occupancy",
             h2("ICU L3 occupancy and forecasts", align = "center"),
             br(),
             br(),
@@ -54,7 +65,8 @@ ui <- fluidPage(
                      column(4, numericInput(inputId="limit",
                                   "ICU Funding Limit",
                                   value=28))),
-            plotlyOutput(outputId = "occupancy"),
+            plotlyOutput(outputId = "occupancy")),
+            tabPanel("Admission Stats",
             h2("Admission statistics", align = "center"),
             fluidRow(column(6, selectInput(inputId="violin.y",
                                             label="Y-axis Variable",
@@ -79,19 +91,74 @@ ui <- fluidPage(
                                             label="Bandwidth adjustment",
                                             value=1,
                                             step=0.1)),
-                     column(6, plotlyOutput(outputId = "density"))),
-            h2("Survival curves", align = "center")
-        )
-    )
+                     column(6, plotlyOutput(outputId = "density")))),
+            tabPanel("Survival curves",
+            h2("Survival curves", align = "center"),
+            br(),
+            h4("Covid vs Non-Covid"),
+            fluidRow(column(6, selectInput(inputId="kap.time",
+                                           label="Timeframe",
+                                           choices=kap.times,
+                                           selected="`ICU Duration (hours)`"),
+                               selectInput(inputId="kap.event",
+                                           label="Event",
+                                           choices=kap.events,
+                                           selected="ICUSurvival")),
+                     column(6, plotOutput(outputId = "kap"))),
+            br(),
+            h4("Within the Covid cohort:"),
+            fluidRow(column(6, selectInput(inputId="kap.time.covid",
+                                           label="Timeframe",
+                                           choices=kap.times,
+                                           selected="`ICU Duration (hours)`"),
+                            selectInput(inputId="kap.event.covid",
+                                        label="Event",
+                                        choices=kap.events,
+                                        selected="ICUSurvival"),
+                             selectInput(inputId="kap.factor.covid",
+                                         label="Factor",
+                                         choices=disc.vars,
+                                         selected="sex")),
+                     column(6, plotOutput(outputId = "kap.covid"))),
+            br(),
+            h4("Cox proportional hazard model:"),
+            fluidRow(column(6, selectInput(inputId="cox.time",
+                                           label="TimeFrame",
+                                           choices=kap.times,
+                                           selected="`ICU Duration (hours)`"),
+                            selectInput(inputId="cox.event",
+                                        label="Event",
+                                        choices=kap.events,
+                                        selected="ICUSurvival"),
+                            selectInput(inputId="cox.covar1",
+                                        label="1st covariate",
+                                        choices=all.vars,
+                                        selected="sex"),
+                            selectInput(inputId="cox.covar2",
+                                        label="2nd covariate",
+                                        choices=all.vars,
+                                        selected="age"),
+                            selectInput(inputId="cox.covar3",
+                                        label="3rd covariate",
+                                        choices=all.vars,
+                                        selected="weight")),
+                     column(6, plotOutput(outputId = "cox"))),
+            fluidRow(verbatimTextOutput(outputId = "cox.print"))
+        ))
+    ))
 )
 
-# Define server logic required to draw a histogram
+#--------------------------------------------------------#
+######################### SERVER #########################
+#--------------------------------------------------------#
+
 server <- function(input, output) {
     ######### OCCUPANCY PLOTS #########
     output$occupancy <- renderPlotly(
         ggplotly(
             occ.aggregates %>% 
-                filter(DateTime >= input$occ.start & DateTime <= input$occ.end) %>%
+                filter(DateTime >= input$occ.start & 
+                           DateTime <= input$occ.end) %>%
                 ggplot(aes(x=DateTime)) +
                 geom_bar(aes(y=L3, fill=L3), stat='identity', alpha=1) +
                 geom_line(aes(y=L3Covid, colour='L3Covid')) +
@@ -131,7 +198,7 @@ server <- function(input, output) {
                                            select(y)))
         covid.norm.p <- shapiro.test(covid)$p.value
         not.covid.norm.p <- shapiro.test(not.covid)$p.value
-        norm <- covid.p > 0.05 & not.covid.p > 0.05
+        norm <- covid.norm.p > 0.05 & not.covid.norm.p > 0.05
         if(norm){
             # Are the variances equal?
             if(var.test(covid, 
@@ -160,10 +227,10 @@ server <- function(input, output) {
         ggplotly(
             admissions %>%
                 ggplot(aes_string(x='covid19', 
-                                  y=input$violin.y,
-                                  text='Hospital_Number')) +
+                                  y=input$violin.y)) +
                 geom_violin(alpha=0.1) +
-                geom_jitter(aes_string(fill=input$violin.colour), 
+                geom_jitter(aes_string(fill=input$violin.colour,
+                                       text='Hospital_Number'), 
                             width=input$violin.jitter, 
                             height=0,
                             shape = 21,
@@ -187,7 +254,70 @@ server <- function(input, output) {
                                                       colour = "grey50"))
         )
     )
-    
+    # Survival curves
+    output$kap <- renderPlot({
+        d <- admissions %>% 
+            select(c(input$kap.time, 
+                     input$kap.event,
+                     "covid19")) %>%
+            as.data.frame()
+        colnames(d) <- c("Time", "Event", "Covid")
+        fit <- survfit(Surv(Time, Event) ~ Covid, data=d)
+        ggsurvplot(fit,
+                   pval = TRUE, conf.int = TRUE,
+                   linetype = "strata", # Change line type by groups
+                   surv.median.line = "hv", # Specify median survival
+                   ggtheme = theme_bw(), # Change ggplot2 theme
+                   palette = c("#E7B800", "#2E9FDF"),
+                   data=d)
+    })
+    output$kap.covid <- renderPlot({
+        d <- admissions %>% 
+            filter(covid19 == "Yes") %>%
+            select(c(input$kap.time.covid, 
+                     input$kap.event.covid,
+                     input$kap.factor.covid)) %>%
+            as.data.frame()
+        colnames(d) <- c("time", "event", "factor")
+        fit <- survfit(Surv(time, event) ~ factor, data=d)
+        ggsurvplot(fit,
+                   pval = TRUE, conf.int = TRUE,
+                   linetype = "strata", # Change line type by groups
+                   surv.median.line = "hv", # Specify median survival
+                   ggtheme = theme_bw(), # Change ggplot2 theme
+                   palette = c("#E7B800", "#2E9FDF"),
+                   data=d)
+    })
+    output$cox <- renderPlot({
+        d <- admissions %>% 
+            filter(covid19 == "Yes") %>%
+            select(c(input$cox.time, 
+                     input$cox.event,
+                     input$cox.covar1,
+                     input$cox.covar2,
+                     input$cox.covar3))
+        d <- d %>% as.data.frame()
+        colnames(d) <- c("time", "event",
+                         "covar1","covar2","covar3")
+        cox.fit <- coxph(Surv(time, event) ~ covar1 + covar2 + covar3,
+                         data=d)
+        ggforest(cox.fit, data=d)
+    })
+    output$cox.print <- renderPrint({
+        d <- admissions %>%
+            filter(covid19 == "Yes") %>%
+            select(c(input$cox.time, 
+                     input$cox.event,
+                     input$cox.covar1,
+                     input$cox.covar2,
+                     input$cox.covar3)) %>%
+            as.data.frame()
+        colnames(d) <- c("time", "event",
+                         "covar1","covar2","covar3")
+        cox.fit <- coxph(Surv(time, event) ~ covar1 + covar2 + covar3,
+                         data=d)
+        return(summary(cox.fit))
+    })
 }
 
 # Run the application 
