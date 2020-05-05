@@ -1,3 +1,24 @@
+checkPackages <- function(){
+    requirements <- c("shiny",
+                      "shinythemes",
+                      "tidyverse",
+                      "readxl",
+                      "lubridate",
+                      "testit",
+                      "plotly",
+                      "survival",
+                      "survminer")
+    check <- match(requirements, 
+                   utils::installed.packages()[,1])
+    packagestoinstall <- requirements[is.na(check)]
+    if(length( packagestoinstall ) > 0L){
+        utils::install.packages(packagestoinstall)
+    }else{
+        print("All requirements already fulfilled")
+    }
+    
+}
+checkPackages()
 library(shiny)
 library(shinythemes)
 library(tidyverse)
@@ -254,7 +275,7 @@ server <- function(input, output) {
                                                       colour = "grey50"))
         )
     )
-    # Survival curves
+    ######### SURVIVAL ANALYSIS #########
     output$kap <- renderPlot({
         d <- admissions %>% 
             select(c(input$kap.time, 
