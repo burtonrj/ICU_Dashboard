@@ -1,6 +1,8 @@
 data
 specs.docx
 documentation.docx
+*.xlsx
+*.csv
 sys.png
 data.xlsx
 .Rproj.user
