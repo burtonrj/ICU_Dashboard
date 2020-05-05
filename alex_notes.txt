@@ -1,0 +1,6 @@
+Plan of action here.
+
+# Check through graphs and code.
+# Suggest some alternate visualisations.
+# Check whether this works in base R.
+# Email progress to the doctors.

@@ -1,3 +1,25 @@
+checkPackages <- function(){
+    requirements <- c("shiny",
+                      "shinythemes",
+                      "tidyverse",
+                      "readxl",
+                      "lubridate",
+                      "testit",
+                      "plotly",
+                      "survival",
+                      "survminer")
+    check <- match(requirements, 
+                   utils::installed.packages()[,1])
+    packagestoinstall <- requirements[is.na(check)]
+    if(length( packagestoinstall ) > 0L){
+        utils::install.packages(packagestoinstall)
+    }else{
+        print("All requirements already fulfilled")
+    }
+    
+}
+checkPackages()
+
 library(shiny)
 library(shinythemes)
 library(tidyverse)
@@ -45,7 +67,7 @@ ui <- fluidPage(
                        Data must be located in the app directory and named
                        `data.xlsx`. See app documentation for details."),
                      br(),
-                     p("Authored by: Ross Burton, Alexander Greenshield-Watson,
+                     p("Authored by: Ross Burton, Alexander Greenshields-Watson,
                        and Michael Ware"),
                      br(),
                      h5("Contact"),
