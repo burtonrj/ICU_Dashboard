@@ -1,6 +1,6 @@
 checkPackages <- function(){
     requirements <- c("shiny",
-                      "shinythemes",
+                      #"shinythemes",
                       "tidyverse",
                       "readxl",
                       "lubridate",
@@ -21,7 +21,7 @@ checkPackages <- function(){
 checkPackages()
 
 library(shiny)
-library(shinythemes)
+#library(shinythemes)
 library(tidyverse)
 library(readxl)
 library(lubridate)
@@ -55,7 +55,7 @@ kap.events <- c('ICUSurvival', 'HospSurvival')
 #--------------------------------------------------------#
 
 ui <- fluidPage(
-    theme = shinytheme("untitled"),
+    theme = NULL,
     titlePanel("ICU Covid Dashboard"),
     sidebarLayout(
         sidebarPanel(img(src="logo.png", width=200),
